@@ -1,312 +1,620 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Save, Download, Clock, DollarSign, Smartphone, MapPin } from 'lucide-react';
-import * as XLSX from 'xlsx';
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Ventas de Relojes</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-const SalesTracker = () => {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [sales, setSales] = useState({});
-  const [formData, setFormData] = useState({
-    celular: '',
-    modelo: '',
-    capital: '',
-    venta: '',
-    envio: ''
-  });
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
 
-  // Cargar datos del localStorage al iniciar
-  useEffect(() => {
-    const savedSales = localStorage.getItem('watchSales');
-    if (savedSales) {
-      setSales(JSON.parse(savedSales));
-    }
-  }, []);
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
 
-  // Guardar en localStorage cuando cambian las ventas
-  useEffect(() => {
-    localStorage.setItem('watchSales', JSON.stringify(sales));
-  }, [sales]);
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
 
-  // Calcular ganancia automáticamente
-  const ganancia = formData.venta && formData.capital ? 
-    parseFloat(formData.venta) - parseFloat(formData.capital) : 0;
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
 
-  // Obtener ventas del día seleccionado
-  const getDailySales = () => {
-    return sales[selectedDate] || [];
-  };
+        .header .subtitle {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 20px;
+        }
 
-  // Manejar cambios en el formulario
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+        .date-selector {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8f9fa;
+            padding: 10px 20px;
+            border-radius: 25px;
+            border: 2px solid #e9ecef;
+        }
 
-  // Guardar venta
-  const handleSave = () => {
-    if (!formData.celular || !formData.modelo || !formData.capital || !formData.venta) {
-      alert('Por favor, completa todos los campos obligatorios');
-      return;
-    }
+        .date-selector input {
+            border: none;
+            background: none;
+            font-size: 1.1em;
+            padding: 5px;
+            color: #333;
+        }
 
-    const newSale = {
-      id: Date.now(),
-      fecha: selectedDate,
-      celular: formData.celular,
-      modelo: formData.modelo,
-      capital: parseFloat(formData.capital),
-      venta: parseFloat(formData.venta),
-      ganancia: ganancia,
-      envio: formData.envio
-    };
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
 
-    setSales(prev => ({
-      ...prev,
-      [selectedDate]: [...(prev[selectedDate] || []), newSale]
-    }));
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
 
-    // Limpiar formulario
-    setFormData({
-      celular: '',
-      modelo: '',
-      capital: '',
-      venta: '',
-      envio: ''
-    });
+        .card h2 {
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 1.5em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
 
-    alert('Venta guardada exitosamente');
-  };
+        .form-group {
+            margin-bottom: 20px;
+        }
 
-  // Exportar a Excel
-  const handleExport = () => {
-    const dailySales = getDailySales();
-    
-    if (dailySales.length === 0) {
-      alert('No hay ventas para exportar en la fecha seleccionada');
-      return;
-    }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
 
-    const exportData = dailySales.map(sale => ({
-      'Fecha': sale.fecha,
-      'Celular': sale.celular,
-      'Modelo': sale.modelo,
-      'Capital': sale.capital,
-      'Venta': sale.venta,
-      'Ganancia': sale.ganancia,
-      'Envío': sale.envio
-    }));
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
-    
-    XLSX.writeFile(wb, `ventas_${selectedDate}.xlsx`);
-  };
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
 
-  // Eliminar venta
-  const handleDelete = (saleId) => {
-    if (confirm('¿Estás seguro de que deseas eliminar esta venta?')) {
-      setSales(prev => ({
-        ...prev,
-        [selectedDate]: prev[selectedDate].filter(sale => sale.id !== saleId)
-      }));
-    }
-  };
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
 
-  const dailySales = getDailySales();
-  const totalGanancia = dailySales.reduce((sum, sale) => sum + sale.ganancia, 0);
+        .ganancia-display {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.1em;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex items-center justify-center mb-4">
-            <Clock className="w-8 h-8 text-indigo-600 mr-3" />
-            <h1 className="text-3xl font-bold text-gray-800">Registro de Ventas de Relojes</h1>
-          </div>
-          
-          {/* Selector de fecha */}
-          <div className="flex items-center justify-center">
-            <Calendar className="w-5 h-5 text-indigo-600 mr-2" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-        </div>
+        .ganancia-positive {
+            background: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Formulario de registro */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Nueva Venta</h2>
+        .ganancia-negative {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            font-size: 0.8em;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .sales-list {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .sale-item {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .sale-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .sale-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .sale-model {
+            font-weight: bold;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .sale-details {
+            font-size: 0.9em;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .sale-ganancia {
+            font-weight: bold;
+            font-size: 1em;
+            margin-top: 5px;
+        }
+
+        .summary {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .required {
+            color: #dc3545;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
             
-            <div className="space-y-4">
-              <div>
-                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                  <Smartphone className="w-4 h-4 mr-1" />
-                  Número de Celular *
-                </label>
-                <input
-                  type="tel"
-                  name="celular"
-                  value={formData.celular}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Ej: +591 12345678"
-                />
-              </div>
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .actions {
+                flex-direction: column;
+            }
+            
+            .actions .btn {
+                width: 100%;
+            }
+        }
 
-              <div>
-                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                  <Clock className="w-4 h-4 mr-1" />
-                  Modelo de Reloj *
-                </label>
-                <input
-                  type="text"
-                  name="modelo"
-                  value={formData.modelo}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Ej: Rolex Submariner"
-                />
-              </div>
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                    <DollarSign className="w-4 h-4 mr-1" />
-                    Capital (Bs) *
-                  </label>
-                  <input
-                    type="number"
-                    name="capital"
-                    value={formData.capital}
-                    onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="0.00"
-                    step="0.01"
-                  />
-                </div>
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
 
-                <div>
-                  <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                    <DollarSign className="w-4 h-4 mr-1" />
-                    Venta (Bs) *
-                  </label>
-                  <input
-                    type="number"
-                    name="venta"
-                    value={formData.venta}
-                    onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="0.00"
-                    step="0.01"
-                  />
-                </div>
-              </div>
+        .notification.success {
+            background: #28a745;
+        }
 
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">
-                  Ganancia (Bs)
-                </label>
-                <div className={`w-full border rounded-lg px-3 py-2 bg-gray-50 ${ganancia >= 0 ? 'text-green-600' : 'text-red-600'} font-semibold`}>
-                  {ganancia.toFixed(2)}
-                </div>
-              </div>
+        .notification.error {
+            background: #dc3545;
+        }
 
-              <div>
-                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  Destino de Envío
-                </label>
-                <input
-                  type="text"
-                  name="envio"
-                  value={formData.envio}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Ej: La Paz, Bolivia"
-                />
-              </div>
-
-              <button
-                onClick={handleSave}
-                className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center font-medium"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Guardar Venta
-              </button>
+        .icon {
+            display: inline-block;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⌚ Registro de Ventas de Relojes</h1>
+            <p class="subtitle">Gestiona tus ventas diarias de manera eficiente</p>
+            <div class="date-selector">
+                <span class="icon">📅</span>
+                <label for="selectedDate">Fecha:</label>
+                <input type="date" id="selectedDate">
             </div>
-          </div>
-
-          {/* Lista de ventas del día */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">
-                Ventas del {new Date(selectedDate + 'T00:00:00').toLocaleDateString('es-ES')}
-              </h2>
-              {dailySales.length > 0 && (
-                <button
-                  onClick={handleExport}
-                  className="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center text-sm font-medium"
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  Descargar Excel
-                </button>
-              )}
-            </div>
-
-            {dailySales.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No hay ventas registradas para esta fecha</p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
-                  {dailySales.map((sale) => (
-                    <div key={sale.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="font-medium text-gray-800">{sale.modelo}</div>
-                        <button
-                          onClick={() => handleDelete(sale.id)}
-                          className="text-red-500 hover:text-red-700 text-sm"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <div>📱 {sale.celular}</div>
-                        <div>💰 Capital: {sale.capital.toFixed(2)} Bs | Venta: {sale.venta.toFixed(2)} Bs</div>
-                        <div className={`font-medium ${sale.ganancia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          📈 Ganancia: {sale.ganancia.toFixed(2)} Bs
-                        </div>
-                        {sale.envio && <div>📍 {sale.envio}</div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="border-t pt-4">
-                  <div className="flex justify-between items-center font-semibold text-lg">
-                    <span>Total del día:</span>
-                    <span className={totalGanancia >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {totalGanancia.toFixed(2)} Bs
-                    </span>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
         </div>
-      </div>
-    </div>
-  );
-};
 
-export default SalesTracker;
+        <div class="main-content">
+            <!-- Formulario de registro -->
+            <div class="card">
+                <h2>📝 Nueva Venta</h2>
+                <form id="salesForm">
+                    <div class="form-group">
+                        <label for="celular">📱 Número de Celular <span class="required">*</span></label>
+                        <input type="tel" id="celular" placeholder="Ej: +591 12345678" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="modelo">⌚ Modelo de Reloj <span class="required">*</span></label>
+                        <input type="text" id="modelo" placeholder="Ej: Rolex Submariner" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="capital">💰 Capital (Bs) <span class="required">*</span></label>
+                            <input type="number" id="capital" placeholder="0.00" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="venta">💵 Venta (Bs) <span class="required">*</span></label>
+                            <input type="number" id="venta" placeholder="0.00" step="0.01" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📈 Ganancia (Bs)</label>
+                        <div id="gananciaDisplay" class="ganancia-display">0.00</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="envio">📍 Destino de Envío</label>
+                        <input type="text" id="envio" placeholder="Ej: La Paz, Bolivia">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <span class="icon">💾</span>
+                        Guardar Venta
+                    </button>
+                </form>
+            </div>
+
+            <!-- Lista de ventas -->
+            <div class="card">
+                <div class="actions">
+                    <h2 id="salesTitle">📊 Ventas del día</h2>
+                    <button id="exportBtn" class="btn btn-success" style="display: none;">
+                        <span class="icon">📥</span>
+                        Descargar Excel
+                    </button>
+                </div>
+
+                <div id="salesList" class="sales-list">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <p>No hay ventas registradas para esta fecha</p>
+                    </div>
+                </div>
+
+                <div id="summary" class="summary" style="display: none;">
+                    <span>Total del día:</span>
+                    <span id="totalGanancia">0.00 Bs</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        class SalesTracker {
+            constructor() {
+                this.sales = this.loadSales();
+                this.selectedDate = this.getTodayDate();
+                this.initializeElements();
+                this.bindEvents();
+                this.updateDisplay();
+            }
+
+            initializeElements() {
+                this.dateInput = document.getElementById('selectedDate');
+                this.form = document.getElementById('salesForm');
+                this.salesList = document.getElementById('salesList');
+                this.exportBtn = document.getElementById('exportBtn');
+                this.summary = document.getElementById('summary');
+                this.totalGanancia = document.getElementById('totalGanancia');
+                this.salesTitle = document.getElementById('salesTitle');
+                this.gananciaDisplay = document.getElementById('gananciaDisplay');
+                
+                // Set today's date
+                this.dateInput.value = this.selectedDate;
+            }
+
+            bindEvents() {
+                this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+                this.dateInput.addEventListener('change', (e) => this.handleDateChange(e));
+                this.exportBtn.addEventListener('click', () => this.exportToExcel());
+                
+                // Calculate ganancia in real time
+                document.getElementById('capital').addEventListener('input', () => this.updateGanancia());
+                document.getElementById('venta').addEventListener('input', () => this.updateGanancia());
+            }
+
+            getTodayDate() {
+                return new Date().toISOString().split('T')[0];
+            }
+
+            loadSales() {
+                const saved = localStorage.getItem('watchSales');
+                return saved ? JSON.parse(saved) : {};
+            }
+
+            saveSales() {
+                localStorage.setItem('watchSales', JSON.stringify(this.sales));
+            }
+
+            updateGanancia() {
+                const capital = parseFloat(document.getElementById('capital').value) || 0;
+                const venta = parseFloat(document.getElementById('venta').value) || 0;
+                const ganancia = venta - capital;
+                
+                this.gananciaDisplay.textContent = ganancia.toFixed(2);
+                this.gananciaDisplay.className = 'ganancia-display';
+                
+                if (ganancia > 0) {
+                    this.gananciaDisplay.classList.add('ganancia-positive');
+                } else if (ganancia < 0) {
+                    this.gananciaDisplay.classList.add('ganancia-negative');
+                }
+            }
+
+            handleSubmit(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this.form);
+                const celular = document.getElementById('celular').value.trim();
+                const modelo = document.getElementById('modelo').value.trim();
+                const capital = parseFloat(document.getElementById('capital').value);
+                const venta = parseFloat(document.getElementById('venta').value);
+                const envio = document.getElementById('envio').value.trim();
+
+                if (!celular || !modelo || isNaN(capital) || isNaN(venta)) {
+                    this.showNotification('Por favor, completa todos los campos obligatorios', 'error');
+                    return;
+                }
+
+                const ganancia = venta - capital;
+                const sale = {
+                    id: Date.now(),
+                    fecha: this.selectedDate,
+                    celular,
+                    modelo,
+                    capital,
+                    venta,
+                    ganancia,
+                    envio: envio || 'No especificado'
+                };
+
+                if (!this.sales[this.selectedDate]) {
+                    this.sales[this.selectedDate] = [];
+                }
+
+                this.sales[this.selectedDate].push(sale);
+                this.saveSales();
+                this.form.reset();
+                this.updateGanancia();
+                this.updateDisplay();
+                this.showNotification('Venta guardada exitosamente', 'success');
+            }
+
+            handleDateChange(e) {
+                this.selectedDate = e.target.value;
+                this.updateDisplay();
+            }
+
+            deleteSale(saleId) {
+                if (confirm('¿Estás seguro de que deseas eliminar esta venta?')) {
+                    this.sales[this.selectedDate] = this.sales[this.selectedDate].filter(
+                        sale => sale.id !== saleId
+                    );
+                    this.saveSales();
+                    this.updateDisplay();
+                    this.showNotification('Venta eliminada', 'success');
+                }
+            }
+
+            updateDisplay() {
+                const dailySales = this.sales[this.selectedDate] || [];
+                const formattedDate = new Date(this.selectedDate + 'T00:00:00').toLocaleDateString('es-ES');
+                this.salesTitle.textContent = `📊 Ventas del ${formattedDate}`;
+
+                if (dailySales.length === 0) {
+                    this.salesList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📋</div>
+                            <p>No hay ventas registradas para esta fecha</p>
+                        </div>
+                    `;
+                    this.exportBtn.style.display = 'none';
+                    this.summary.style.display = 'none';
+                } else {
+                    this.renderSales(dailySales);
+                    this.exportBtn.style.display = 'block';
+                    this.summary.style.display = 'flex';
+                    
+                    const total = dailySales.reduce((sum, sale) => sum + sale.ganancia, 0);
+                    this.totalGanancia.textContent = `${total.toFixed(2)} Bs`;
+                    this.totalGanancia.style.color = total >= 0 ? '#28a745' : '#dc3545';
+                }
+            }
+
+            renderSales(sales) {
+                this.salesList.innerHTML = sales.map(sale => `
+                    <div class="sale-item">
+                        <div class="sale-header">
+                            <div class="sale-model">${sale.modelo}</div>
+                            <button class="btn btn-danger" onclick="salesTracker.deleteSale(${sale.id})">
+                                ❌
+                            </button>
+                        </div>
+                        <div class="sale-details">
+                            <div>📱 ${sale.celular}</div>
+                            <div>💰 Capital: ${sale.capital.toFixed(2)} Bs | Venta: ${sale.venta.toFixed(2)} Bs</div>
+                            <div class="sale-ganancia" style="color: ${sale.ganancia >= 0 ? '#28a745' : '#dc3545'}">
+                                📈 Ganancia: ${sale.ganancia.toFixed(2)} Bs
+                            </div>
+                            <div>📍 ${sale.envio}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            exportToExcel() {
+                const dailySales = this.sales[this.selectedDate] || [];
+                
+                if (dailySales.length === 0) {
+                    this.showNotification('No hay ventas para exportar', 'error');
+                    return;
+                }
+
+                const exportData = dailySales.map(sale => ({
+                    'Fecha': sale.fecha,
+                    'Celular': sale.celular,
+                    'Modelo': sale.modelo,
+                    'Capital': sale.capital,
+                    'Venta': sale.venta,
+                    'Ganancia': sale.ganancia,
+                    'Envío': sale.envio
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(exportData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
+                
+                XLSX.writeFile(wb, `ventas_${this.selectedDate}.xlsx`);
+                this.showNotification('Archivo Excel descargado', 'success');
+            }
+
+            showNotification(message, type) {
+                const notification = document.getElementById('notification');
+                notification.textContent = message;
+                notification.className = `notification ${type}`;
+                
+                setTimeout(() => notification.classList.add('show'), 100);
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+        }
+
+        // Initialize the application
+        let salesTracker;
+        document.addEventListener('DOMContentLoaded', () => {
+            salesTracker = new SalesTracker();
+        });
+    </script>
+</body>
+</html>
