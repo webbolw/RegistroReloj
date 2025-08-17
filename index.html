@@ -263,8 +263,21 @@
 
         .actions {
             display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
             gap: 15px;
-            align-items: center;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .export-buttons .btn {
+            white-space: nowrap;
         }
 
         @media (max-width: 768px) {
@@ -386,10 +399,16 @@
             <div class="card">
                 <div class="actions">
                     <h2 id="salesTitle">📊 Ventas del día</h2>
-                    <button id="exportBtn" class="btn btn-success" style="display: none;">
-                        <span class="icon">📥</span>
-                        Descargar Excel
-                    </button>
+                    <div class="export-buttons">
+                        <button id="exportDayBtn" class="btn btn-success" style="display: none;">
+                            <span class="icon">📄</span>
+                            Descargar Día
+                        </button>
+                        <button id="exportMonthBtn" class="btn btn-success" style="display: none;">
+                            <span class="icon">📅</span>
+                            Descargar Mes
+                        </button>
+                    </div>
                 </div>
 
                 <div id="salesList" class="sales-list">
@@ -423,7 +442,8 @@
                 this.dateInput = document.getElementById('selectedDate');
                 this.form = document.getElementById('salesForm');
                 this.salesList = document.getElementById('salesList');
-                this.exportBtn = document.getElementById('exportBtn');
+                this.exportDayBtn = document.getElementById('exportDayBtn');
+                this.exportMonthBtn = document.getElementById('exportMonthBtn');
                 this.summary = document.getElementById('summary');
                 this.totalGanancia = document.getElementById('totalGanancia');
                 this.salesTitle = document.getElementById('salesTitle');
@@ -436,7 +456,8 @@
             bindEvents() {
                 this.form.addEventListener('submit', (e) => this.handleSubmit(e));
                 this.dateInput.addEventListener('change', (e) => this.handleDateChange(e));
-                this.exportBtn.addEventListener('click', () => this.exportToExcel());
+                this.exportDayBtn.addEventListener('click', () => this.exportDayToExcel());
+                this.exportMonthBtn.addEventListener('click', () => this.exportMonthToExcel());
                 
                 // Calculate ganancia in real time
                 document.getElementById('capital').addEventListener('input', () => this.updateGanancia());
@@ -538,16 +559,25 @@
                             <p>No hay ventas registradas para esta fecha</p>
                         </div>
                     `;
-                    this.exportBtn.style.display = 'none';
+                    this.exportDayBtn.style.display = 'none';
+                    this.exportMonthBtn.style.display = 'none';
                     this.summary.style.display = 'none';
                 } else {
                     this.renderSales(dailySales);
-                    this.exportBtn.style.display = 'block';
+                    this.exportDayBtn.style.display = 'block';
+                    this.exportMonthBtn.style.display = 'block';
                     this.summary.style.display = 'flex';
                     
                     const total = dailySales.reduce((sum, sale) => sum + sale.ganancia, 0);
                     this.totalGanancia.textContent = `${total.toFixed(2)} Bs`;
                     this.totalGanancia.style.color = total >= 0 ? '#28a745' : '#dc3545';
+                }
+
+                // Mostrar botón de mes si hay ventas en cualquier día del mes
+                const currentMonth = this.selectedDate.substring(0, 7); // YYYY-MM
+                const hasMonthSales = Object.keys(this.sales).some(date => date.startsWith(currentMonth));
+                if (hasMonthSales) {
+                    this.exportMonthBtn.style.display = 'block';
                 }
             }
 
@@ -572,11 +602,11 @@
                 `).join('');
             }
 
-            exportToExcel() {
+            exportDayToExcel() {
                 const dailySales = this.sales[this.selectedDate] || [];
                 
                 if (dailySales.length === 0) {
-                    this.showNotification('No hay ventas para exportar', 'error');
+                    this.showNotification('No hay ventas para exportar en este día', 'error');
                     return;
                 }
 
@@ -592,10 +622,68 @@
 
                 const ws = XLSX.utils.json_to_sheet(exportData);
                 const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
+                XLSX.utils.book_append_sheet(wb, ws, 'Ventas del Día');
                 
-                XLSX.writeFile(wb, `ventas_${this.selectedDate}.xlsx`);
-                this.showNotification('Archivo Excel descargado', 'success');
+                const formattedDate = this.selectedDate.replace(/-/g, '_');
+                XLSX.writeFile(wb, `ventas_dia_${formattedDate}.xlsx`);
+                this.showNotification('Archivo Excel del día descargado', 'success');
+            }
+
+            exportMonthToExcel() {
+                const currentMonth = this.selectedDate.substring(0, 7); // YYYY-MM
+                const monthSales = [];
+
+                // Recopilar todas las ventas del mes
+                Object.keys(this.sales).forEach(date => {
+                    if (date.startsWith(currentMonth)) {
+                        monthSales.push(...this.sales[date]);
+                    }
+                });
+
+                if (monthSales.length === 0) {
+                    this.showNotification('No hay ventas para exportar en este mes', 'error');
+                    return;
+                }
+
+                // Ordenar por fecha
+                monthSales.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+                const exportData = monthSales.map(sale => ({
+                    'Fecha': sale.fecha,
+                    'Celular': sale.celular,
+                    'Modelo': sale.modelo,
+                    'Capital': sale.capital,
+                    'Venta': sale.venta,
+                    'Ganancia': sale.ganancia,
+                    'Envío': sale.envio
+                }));
+
+                // Agregar totales al final
+                const totalCapital = monthSales.reduce((sum, sale) => sum + sale.capital, 0);
+                const totalVenta = monthSales.reduce((sum, sale) => sum + sale.venta, 0);
+                const totalGanancia = monthSales.reduce((sum, sale) => sum + sale.ganancia, 0);
+
+                exportData.push({
+                    'Fecha': '',
+                    'Celular': '',
+                    'Modelo': 'TOTALES DEL MES',
+                    'Capital': totalCapital,
+                    'Venta': totalVenta,
+                    'Ganancia': totalGanancia,
+                    'Envío': ''
+                });
+
+                const ws = XLSX.utils.json_to_sheet(exportData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Ventas del Mes');
+                
+                const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                                  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                const [year, month] = currentMonth.split('-');
+                const monthName = monthNames[parseInt(month) - 1];
+                
+                XLSX.writeFile(wb, `ventas_${monthName}_${year}.xlsx`);
+                this.showNotification(`Archivo Excel de ${monthName} ${year} descargado (${monthSales.length} ventas)`, 'success');
             }
 
             showNotification(message, type) {
